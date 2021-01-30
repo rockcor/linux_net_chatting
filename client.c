@@ -1,4 +1,4 @@
-#include <func.h>
+#include "func.h"
 
 #define MAXFD 10
 
