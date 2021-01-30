@@ -1,35 +1,35 @@
-/*************************************************************************
-	> File Name: client.c
-	> Author: Name
-	> Mail: Name@163.com 
-	> Created Time: 2021-01-29 17:54:15
- ************************************************************************/
+#include <func.h>
 
 #define MAXFD 10
-#include <head.h>
 
-int main(int argc,char* argv[])
+typedef struct
+{
+    char name[64];
+    char msg[128];
+}Messege;
+
+int main(int argc,char *argv[])
 {
     ARGS_CHECK(argc,3);
 
-    //先创建套接字,用于跟服务端通信
-    int serverFd = socket(AF_INET,SOCK_STREAM,0);
+    //创建socket            ipv4    tcp
+    int serverFd=socket(AF_INET,SOCK_STREAM,0);
     ERROR_CHECK(serverFd,-1,"socket");
 
-    //定义结构体，记录ip和端口
+    //记录ip和端口
     struct sockaddr_in serAddr;
     memset(&serAddr,0,sizeof(serAddr));
-    serAddr.sin_family = AF_INET;
-    //把字符串的点分十进制ip转换成网络字节序的二进制ip
-    serAddr.sin_addr.s_addr = inet_addr(argv[1]);
-    serAddr.sin_port = htons(atoi(argv[2]));
- 
-    //connect连接服务器，结构体中填写的是服务器的ip和端口
-    int ret = connect(serverFd,(struct sockaddr*)&serAddr,sizeof(serAddr));
+    serAddr.sin_family=AF_INET;//ipv4
+    serAddr.sin_addr.s_addr=inet_addr(argv[1]);//ip格式转化
+    serAddr.sin_port=htons(atoi(argv[2]));//设置端口为网络字节序
+    
+    //connect连接服务器
+    int ret=connect(serverFd,(struct sockaddr*)&serAddr,
+                    sizeof(serAddr));
     ERROR_CHECK(ret,-1,"connect");
 
-
-    char buf[64]={0};
+    Messege msg;
+    memset(&msg,0,sizeof(msg));
 
     fd_set rdset;
     FD_ZERO(&rdset);
@@ -42,25 +42,27 @@ int main(int argc,char* argv[])
         FD_SET(STDIN_FILENO,&rdset); 
         FD_SET(serverFd,&rdset); 
         readyNum = select(MAXFD,&rdset,NULL,NULL,NULL);
+
         if(readyNum>0)
         {
+            //向服务器发送数据
             if(FD_ISSET(STDIN_FILENO,&rdset))
             {
-                memset(buf,0,sizeof(buf));
-                read(STDIN_FILENO,buf,sizeof(buf));
-                //-1是为了不把最后的\n发出去
-                send(serverFd,buf,strlen(buf)-1,0);
+                memset(&msg,0,sizeof(msg));
+                read(STDIN_FILENO,msg.msg,sizeof(msg.msg));
+                send(serverFd,&msg,sizeof(msg),0);
             }
+
+            //接收服务器的数据
             if(FD_ISSET(serverFd,&rdset)){
-                //serverFd可读，表示客户端有数据到达
-                memset(buf,0,sizeof(buf));
-                ret = recv(serverFd,buf,sizeof(buf),0);
+                memset(&msg,0,sizeof(msg));
+                ret = recv(serverFd,&msg,sizeof(msg),0);
                 if(0 == ret)
                 {
-                    printf("byebye\n");
+                    printf("服务器断开连接\n");
                     break;
                 }
-                printf("buf=%s\n",buf);
+                printf("%s:\n%s",msg.name,msg.msg);
             }
         }
     }
@@ -68,3 +70,4 @@ int main(int argc,char* argv[])
     close(serverFd);
     return 0;
 }
+
