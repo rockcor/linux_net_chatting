@@ -76,7 +76,8 @@ int main(int argc,char *argv[])
             {
                 for(int j=0;j<10;j++)
                 {
-                    //跳过已经连上的，加入新的
+                    //找到第一个空缺位,保持和FD逻辑一致，客户端号等于始终等于下标+4
+                    //也可以采用循环队列的策略
                     if(0==client[j].stat)
                     {
                         client[j].clientFd=accept(listenFd,(struct sockaddr*)&client[j].clientAddr,&addrlen) ;
@@ -91,7 +92,7 @@ int main(int argc,char *argv[])
             //接收客户端发来的数据，并发送给其他客户端
             for(int i=0;i<10;i++)
             {
-                if(FD_ISSET(client[i].clientFd,&rdset)&&1==client[i].stat)
+                if(FD_ISSET(client[i].clientFd,&rdset))
                 {
                     memset(&msg,0,sizeof(msg));
                     ret=recv(client[i].clientFd,&msg,sizeof(msg),0);
@@ -104,11 +105,11 @@ int main(int argc,char *argv[])
                     }
                     else
                     {
+                        strcpy(msg.name,inet_ntoa(client[i].clientAddr.sin_addr));
                         for(int j=0;j<10;j++)
                         {
                             //发给其他所有连接着的客户端
                             if(j!=i&&1==client[j].stat)
-                               strcpy(msg.name,inet_ntoa(client[j].clientAddr.sin_addr));
                                 send(client[j].clientFd,&msg,sizeof(msg),0);
                         }
                     }
