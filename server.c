@@ -13,11 +13,11 @@ typedef struct
 {
     char name[64];
     char msg[128];
-}Messege;
+}Message;
 
 int main(int argc,char *argv[])
 {
-    ARGS_CHECK(argc,3);
+    ARGS_CHECK(argc,3);//./server own_ip specified_port
 
     //创建socket            ipv4    tcp
     int listenFd=socket(AF_INET,SOCK_STREAM,0);
@@ -33,32 +33,30 @@ int main(int argc,char *argv[])
     struct sockaddr_in serAddr;
     memset(&serAddr,0,sizeof(serAddr));
     serAddr.sin_family=AF_INET;//ipv4
-    serAddr.sin_addr.s_addr=inet_addr(argv[1]);//ip格式转化
+    serAddr.sin_addr.s_addr=inet_addr(argv[1]);//ip点分十进制转网络字节序
     serAddr.sin_port=htons(atoi(argv[2]));//设置端口为网络字节序
     
     //bind绑定ip和端口     把新类型转成老类型
-    ret=bind(listenFd,(struct sockaddr*)&serAddr,
-                 sizeof(serAddr));
+    ret=bind(listenFd,(struct sockaddr*)&serAddr,sizeof(serAddr));
     ERROR_CHECK(ret,-1,"bind");
 
-    //listen监听        指定同时能处理的最大连接要求，最大128
-    ret=listen(listenFd,10);
+    //listen监听        指定同时能处理的最大连接要求，也是全连接套接字队列大小，最大128
+    ret=listen(listenFd,20);
     ERROR_CHECK(ret,-1,"listen");
 
-    Client client[10];
+    Client client[10];//定义结构体数组，存储连接上的客户端fd等
     memset(&client,0,sizeof(client));
 
-    Messege msg;
+    Message msg;
     memset(&msg,0,sizeof(msg));
 
     fd_set rdset;
-    FD_ZERO(&rdset);
 
     fd_set moniterSet;
     FD_ZERO(&moniterSet);
     FD_SET(listenFd,&moniterSet);
 
-    //select返回值是可读文件描述符的数量
+    //可读文件描述符的数量
     int readyNum=0;
 
     while(1)
@@ -77,10 +75,10 @@ int main(int argc,char *argv[])
             {
                 for(int j=0;j<10;j++)
                 {
+                    //跳过已经连上的，加入新的
                     if(0==client[j].stat)
                     {
-                        client[j].clientFd=accept(listenFd,
-                                                  NULL,NULL);
+                        client[j].clientFd=accept(listenFd,NULL,NULL);
                         client[j].stat=1;
                         printf("客户端%d已连接\n",
                                client[j].clientFd);
@@ -113,6 +111,7 @@ int main(int argc,char *argv[])
                                 client[i].clientFd);
                         for(int j=0;j<10;j++)
                         {
+                            //发给其他所有连接着的客户端
                             if(j!=i&&1==client[j].stat)
                                 send(client[j].clientFd,
                                      &msg,sizeof(msg),0);
