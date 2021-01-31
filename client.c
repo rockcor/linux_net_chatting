@@ -1,11 +1,11 @@
 #include "func.h"
 
-#define MAXFD 10
+#define MAXFD 5
 
 typedef struct
 {
     char name[64];
-    char msg[128];
+    char buf[128];
 }Messege;
 
 int main(int argc,char *argv[])
@@ -49,7 +49,8 @@ int main(int argc,char *argv[])
             if(FD_ISSET(STDIN_FILENO,&rdset))
             {
                 memset(&msg,0,sizeof(msg));
-                read(STDIN_FILENO,msg.msg,sizeof(msg.msg));
+                read(STDIN_FILENO,msg.buf,sizeof(msg.buf));
+                strcpy(msg.name,argv[1]);
                 send(serverFd,&msg,sizeof(msg),0);
             }
 
@@ -62,7 +63,7 @@ int main(int argc,char *argv[])
                     printf("服务器断开连接\n");
                     break;
                 }
-                printf("%s:\n%s",msg.name,msg.msg);
+                printf("%s:%s",msg.name,msg.buf);
             }
         }
     }

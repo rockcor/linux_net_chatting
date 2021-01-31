@@ -5,6 +5,7 @@
 typedef struct
 {
     int clientFd;
+    struct sockaddr_in clientAddr;
     int stat;//连接状态，0未连接，1已连接
 }Client;
 
@@ -12,7 +13,7 @@ typedef struct
 typedef struct
 {
     char name[64];
-    char msg[128];
+    char buf[128];
 }Message;
 
 int main(int argc,char *argv[])
@@ -35,7 +36,7 @@ int main(int argc,char *argv[])
     serAddr.sin_family=AF_INET;//ipv4
     serAddr.sin_addr.s_addr=inet_addr(argv[1]);//ip点分十进制转网络字节序
     serAddr.sin_port=htons(atoi(argv[2]));//设置端口为网络字节序
-    
+
     //bind绑定ip和端口     把新类型转成老类型
     ret=bind(listenFd,(struct sockaddr*)&serAddr,sizeof(serAddr));
     ERROR_CHECK(ret,-1,"bind");
@@ -46,6 +47,8 @@ int main(int argc,char *argv[])
 
     Client client[10];//定义结构体数组，存储连接上的客户端fd等
     memset(&client,0,sizeof(client));
+    //不用socklen_t会报错
+    socklen_t addrlen=sizeof(client[0].clientAddr);
 
     Message msg;
     memset(&msg,0,sizeof(msg));
@@ -62,9 +65,7 @@ int main(int argc,char *argv[])
     while(1)
     {
         FD_ZERO(&rdset);
-
         memcpy(&rdset,&moniterSet,sizeof(moniterSet));
-
         readyNum=select(MAXFD,&rdset,NULL,NULL,NULL);
         ERROR_CHECK(readyNum,-1,"select");
 
@@ -78,10 +79,9 @@ int main(int argc,char *argv[])
                     //跳过已经连上的，加入新的
                     if(0==client[j].stat)
                     {
-                        client[j].clientFd=accept(listenFd,NULL,NULL);
+                        client[j].clientFd=accept(listenFd,(struct sockaddr*)&client[j].clientAddr,&addrlen) ;
                         client[j].stat=1;
-                        printf("客户端%d已连接\n",
-                               client[j].clientFd);
+                        printf("%s已连接\n", inet_ntoa(client[j].clientAddr.sin_addr));
                         FD_SET(client[j].clientFd,&moniterSet);
                         break;
                     }
@@ -94,34 +94,29 @@ int main(int argc,char *argv[])
                 if(FD_ISSET(client[i].clientFd,&rdset)&&1==client[i].stat)
                 {
                     memset(&msg,0,sizeof(msg));
-                
-                    ret=recv(client[i].clientFd,&msg,
-                             sizeof(msg),0);
+                    ret=recv(client[i].clientFd,&msg,sizeof(msg),0);
                     if(0==ret)
                     {
-                        printf("客户端%d断开连接\n",
-                               client[i].clientFd);
+                        printf("%s断开连接\n",inet_ntoa(client[i].clientAddr.sin_addr));
                         close(client[i].clientFd);
                         FD_CLR(client[i].clientFd,&moniterSet);
                         memset(&client[i],0,sizeof(client[i]));
                     }
                     else
                     {
-                        sprintf(msg.name,"客户端%d",
-                                client[i].clientFd);
                         for(int j=0;j<10;j++)
                         {
                             //发给其他所有连接着的客户端
                             if(j!=i&&1==client[j].stat)
-                                send(client[j].clientFd,
-                                     &msg,sizeof(msg),0);
+                               strcpy(msg.name,inet_ntoa(client[j].clientAddr.sin_addr));
+                                send(client[j].clientFd,&msg,sizeof(msg),0);
                         }
                     }
                 }
             }
         }
     }
-    
+
     close(listenFd);
     return 0;
 }
