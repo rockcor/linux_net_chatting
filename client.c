@@ -50,7 +50,6 @@ int main(int argc,char *argv[])
             {
                 memset(&msg,0,sizeof(msg));
                 read(STDIN_FILENO,msg.buf,sizeof(msg.buf));
-                strcpy(msg.name,argv[1]);
                 send(serverFd,&msg,sizeof(msg),0);
             }
 
