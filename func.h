@@ -16,6 +16,7 @@
 #include <dirent.h>
 #include <time.h>
 #include <sys/time.h>
+#include <sys/epoll.h>
 #include <pwd.h>
 #include <grp.h>
 #include <fcntl.h>
