@@ -11,8 +11,10 @@ typedef struct
 //发送的消息
 typedef struct
 {
-    char name[64];
+    char ip[64];
+    uint16_t port;
     char msg[128];
+    short link;
 }Messege;
 
 //保存文件描述符当前的状态
@@ -104,25 +106,28 @@ int main(int argc,char *argv[])
                                  (struct sockaddr*)&tmpAddr,
                                  &tmpLen);
                     ERROR_CHECK(ret,-1,"recvfrom");
+
                     for(j=0;j<10;j++)
                     {
                         //ip和端口相同，则发送信息
-                        if(client[j].cliAddr.sin_addr.s_addr==tmpAddr.sin_addr.s_addr&&client[j].cliAddr.sin_port==tmpAddr.sin_port)
+                        if(client[j].cliAddr.sin_addr.s_addr==tmpAddr.sin_addr.s_addr&&client[j].cliAddr.sin_port==tmpAddr.sin_port&&1==msg.link)
                         {
-                            if(0==ret)//客户端断开连接
-                            {
-                                memset(&client[j],0,sizeof(client[j]));
-                                printf("客户端断开连接\n");
-                                break;
-                            }
                             for(int k=0;k<10;k++)
                             {
                                 if(k==j)
                                 {
                                     continue;
                                 }
+                                strcpy(msg.ip,inet_ntoa(tmpAddr.sin_addr));
+                                msg.port=tmpAddr.sin_port;
                                 sendto(serverFd,&msg,sizeof(msg),0,(struct sockaddr*)&client[k].cliAddr,len[k]);
                             }
+                            break;
+                        }
+                        else if(client[j].cliAddr.sin_addr.s_addr==tmpAddr.sin_addr.s_addr&&client[j].cliAddr.sin_port==tmpAddr.sin_port&&0==msg.link)
+                        {
+                            printf("客户端%d退出\n",j);
+                            memset(&client[j],0,sizeof(client[j]));
                             break;
                         }
                     }
@@ -135,6 +140,7 @@ int main(int argc,char *argv[])
                             {
                                 memcpy(&client[k].cliAddr,&tmpAddr,sizeof(tmpAddr));
                                 client[k].stat=1;
+                                printf("客户端%d连接\n",k);
                                 break;
                             }
                         }

@@ -2,32 +2,46 @@
 
 #define MAXFD 10
 
+int serverFd;
+struct sockaddr_in serAddr;
+socklen_t len;
+
 typedef struct
 {
-    char name[64];
+    char ip[64];
+    uint16_t port;
     char msg[128];
+    short link;
 }Messege;
+
+void sigFunc(int signum)
+{
+    Messege msg;
+    memset(&msg,0,sizeof(msg));
+
+    sendto(serverFd,&msg,sizeof(msg),0,(struct sockaddr*)&serAddr,len);
+}
 
 int main(int argc,char *argv[])
 {
     ARGS_CHECK(argc,3);
 
     //创建socket            ipv4    tcp
-    int serverFd=socket(AF_INET,SOCK_DGRAM,0);
+    serverFd=socket(AF_INET,SOCK_DGRAM,0);
     ERROR_CHECK(serverFd,-1,"socket");
 
     //记录ip和端口
-    struct sockaddr_in serAddr;
     memset(&serAddr,0,sizeof(serAddr));
     serAddr.sin_family=AF_INET;//ipv4
     serAddr.sin_addr.s_addr=inet_addr(argv[1]);//ip格式转化
     serAddr.sin_port=htons(atoi(argv[2]));//设置端口为网络字节序
     
-    socklen_t len=sizeof(serAddr);
+    len=sizeof(serAddr);
 
     Messege msg;
     memset(&msg,0,sizeof(msg));
 
+    msg.link=1;
     int ret=sendto(serverFd,&msg,sizeof(msg),0,(struct sockaddr*)&serAddr,len);
     ERROR_CHECK(ret,-1,"sendto");
 
@@ -52,6 +66,8 @@ int main(int argc,char *argv[])
     ERROR_CHECK(ret,-1,"epoll_ctl");
     int readyNum =0;
 
+    signal(SIGINT,sigFunc);
+
     while(1)
     {
         readyNum=epoll_wait(epfd,cliEvt,3,-1);
@@ -67,17 +83,14 @@ int main(int argc,char *argv[])
                     memset(&msg,0,sizeof(msg));
                     ret=recvfrom(serverFd,&msg,sizeof(msg),0,
                                  (struct sockaddr*)&serAddr,&len);
-                    if(0==ret)
-                    {
-                        printf("服务器断开连接\n");
-                        break;
-                    }
-                    printf("%s:\n%s",msg.name,msg.msg);
+                    ERROR_CHECK(ret,-1,"recvfrom");
+                    printf("%s %d:\n%s",msg.ip,msg.port,msg.msg);
                 }
                 //发消息给服务器
                 if(cliEvt[i].data.fd==STDIN_FILENO)
                 {
                     memset(&msg,0,sizeof(msg));
+                    msg.link=1;
                     read(STDIN_FILENO,msg.msg,sizeof(msg.msg));
                     int ret=sendto(serverFd,&msg,sizeof(msg),0,(struct sockaddr*)&serAddr,len);
                     ERROR_CHECK(ret,-1,"sendto");
